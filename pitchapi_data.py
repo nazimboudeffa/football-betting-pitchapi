@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -49,7 +50,60 @@ TARGET_LEAGUES = [
     ("Ligue 1", {"FRA", "FR"}, {"ligue 1"}),
 ]
 
-TARGET_SEASONS = ["2025/2026", "2026/2027"]
+def _season_code_to_label(value: str) -> Optional[str]:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    if "/" in raw:
+        parts = raw.split("/")
+        if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+            return f"{int(parts[0])}/{int(parts[1])}"
+        return raw
+    if raw.isdigit():
+        year = int(raw)
+        # Convention .env: 2026 => saison 2026/2027
+        if year >= 1900:
+            return f"{year}/{year + 1}"
+    return None
+
+
+def get_configured_seasons() -> List[str]:
+    raw = os.getenv("PITCHAPI_SEASONS", "").strip()
+    seasons: List[str] = []
+    if raw:
+        for part in raw.replace(";", ",").split(","):
+            label = _season_code_to_label(part)
+            if label and label not in seasons:
+                seasons.append(label)
+    if not seasons:
+        seasons = ["2025/2026", "2026/2027"]
+    return seasons
+
+
+def get_default_season() -> str:
+    seasons = get_configured_seasons()
+    raw_default = os.getenv("APP_DEFAULT_SEASON", "").strip()
+    mapped = _season_code_to_label(raw_default)
+    if mapped and mapped in seasons:
+        return mapped
+    if mapped:
+        return mapped
+
+    # Fallback: saison en cours selon la date actuelle (saison européenne commence en été)
+    now = datetime.now()
+    start_year = now.year if now.month >= 7 else now.year - 1
+    current = f"{start_year}/{start_year + 1}"
+    if current in seasons:
+        return current
+    return seasons[0]
+
+
+def get_app_timezone() -> str:
+    return os.getenv("APP_TIMEZONE", "Europe/Paris").strip() or "Europe/Paris"
+
+
+# Compatibilité interne
+TARGET_SEASONS = get_configured_seasons()
 
 
 class PitchAPIError(RuntimeError):

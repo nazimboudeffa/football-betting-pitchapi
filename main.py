@@ -35,10 +35,16 @@ from PyQt6.QtWidgets import (
 
 from football_betting_pitchapi.strategies import StrategyCatalog, load_strategies, strategies_dir
 from football_betting_pitchapi import ai as ai_module
-from pitchapi_data import PitchAPIError, get_target_leagues, get_league_matches
+from pitchapi_data import (
+    PitchAPIError,
+    get_configured_seasons,
+    get_default_season,
+    get_target_leagues,
+    get_league_matches,
+)
 
 
-TARGET_SEASONS = ["2025/2026", "2026/2027"]
+TARGET_SEASONS = get_configured_seasons()
 
 
 def format_match_label(m: dict) -> str:
@@ -75,6 +81,7 @@ class MainWindow(QMainWindow):
         self.current_match: Optional[dict] = None
         self.catalog: StrategyCatalog = load_strategies(strategies_dir(Path(__file__).resolve().parent))
         self.leagues: List[dict] = []
+        self._initializing = True
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -85,6 +92,10 @@ class MainWindow(QMainWindow):
         controls.addWidget(QLabel("Saison:"))
         self.season_combo = QComboBox()
         self.season_combo.addItems(TARGET_SEASONS)
+        default_season = get_default_season()
+        idx = self.season_combo.findText(default_season)
+        if idx >= 0:
+            self.season_combo.setCurrentIndex(idx)
         controls.addWidget(self.season_combo)
 
         controls.addWidget(QLabel("Ligue:"))
@@ -173,6 +184,7 @@ class MainWindow(QMainWindow):
 
         # Init
         self.load_leagues()
+        self._initializing = False
 
     def _populate_strategies(self):
         self.strategy_combo.clear()
@@ -231,6 +243,32 @@ class MainWindow(QMainWindow):
         if self.leagues:
             self.on_league_changed()
 
+    def _match_sort_key(self, match: dict) -> str:
+        pitch = match.get("pitchapi") or {}
+        raw = pitch.get("match") or {}
+        return str(raw.get("time_utc") or match.get("fixture", {}).get("date") or match.get("date") or "")
+
+    def _is_finished_match(self, match: dict) -> bool:
+        status = str((match.get("fixture") or {}).get("status", {}).get("short") or "").lower()
+        if status in {"finished", "ft", "aet", "pen", "after_extra_time", "after_penalties", "completed"}:
+            return True
+        score = match.get("score") or {}
+        ft = score.get("ft") if isinstance(score, dict) else None
+        return isinstance(ft, list) and len(ft) == 2 and ft[0] is not None and ft[1] is not None
+
+    def _default_match_row(self, fixtures: List[dict]) -> int:
+        if not fixtures:
+            return -1
+        now_utc = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        played = [i for i, m in enumerate(fixtures) if self._is_finished_match(m)]
+        if played:
+            return max(played, key=lambda i: self._match_sort_key(fixtures[i]))
+
+        upcoming = [i for i, m in enumerate(fixtures) if self._match_sort_key(m) >= now_utc]
+        if upcoming:
+            return min(upcoming, key=lambda i: self._match_sort_key(fixtures[i]))
+        return len(fixtures) - 1
+
     def on_league_changed(self, *_args):
         league_id = self.league_combo.currentData()
         season = self.season_combo.currentText()
@@ -272,7 +310,11 @@ class MainWindow(QMainWindow):
             self.matches_list.addItem(QListWidgetItem(format_match_label(m)))
 
         if self.fixtures:
-            self.matches_list.setCurrentRow(0)
+            target_row = self._default_match_row(self.fixtures)
+            self.matches_list.setCurrentRow(target_row)
+            item = self.matches_list.item(target_row)
+            if item is not None:
+                self.matches_list.scrollToItem(item)
         else:
             self.current_match = None
             self.update_info_panel()
