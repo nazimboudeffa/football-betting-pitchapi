@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.env
+.idea/
+.vscode/
+*.swp
+.DS_Store
+user_strategies/__pycache__/
+football_betting_pitchapi/__pycache__/
