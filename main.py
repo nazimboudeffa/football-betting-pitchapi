@@ -433,7 +433,15 @@ class MainWindow(QMainWindow):
             row_idx = self.table.rowCount()
             self.table.insertRow(row_idx)
             self.table.setItem(row_idx, 0, QTableWidgetItem(str(r.get("label", ""))))
-            self.table.setItem(row_idx, 1, QTableWidgetItem(str(r.get("prob", ""))))
+            prob_val = r.get("prob", "")
+            if isinstance(prob_val, (int, float)):
+                prob_str = f"{prob_val * 100:.1f}%"
+            else:
+                try:
+                    prob_str = f"{float(prob_val) * 100:.1f}%"
+                except (TypeError, ValueError):
+                    prob_str = str(prob_val)
+            self.table.setItem(row_idx, 1, QTableWidgetItem(prob_str))
             self.table.setItem(row_idx, 2, QTableWidgetItem(str(r.get("odd", ""))))
             self.table.setItem(row_idx, 3, QTableWidgetItem(str(r.get("signal", "") or "")))
         self.details_label.setText(f"{home_name} vs {away_name} ({date}) — Stratégie: {strategy.name}")
