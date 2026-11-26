@@ -1,6 +1,6 @@
 # Football Betting Matrix (PitchAPI)
 
-Application PyQt6 pour afficher les matchs, calculer des probabilités/cotes via les stratégies locales, et lancer une analyse IA optionnelle avec Ollama.
+Application PyQt6 pour afficher les matchs, calculer des probabilités/cotes via les stratégies locales, et lancer une analyse IA optionnelle avec llama.app.
 
 ## Source de données
 
@@ -42,6 +42,21 @@ $env:PITCHAPI_KEY="pk_live_xxx"
 
 L'application lit aussi `PITCHAPI_API_KEY`, `PITCH_API_KEY` ou `PITCH_KEY` en fallback.
 
+### Analyse IA (llama.app)
+
+L'analyse IA est optionnelle et passe par l'API locale compatible OpenAI de [llama.app](https://llama.app) (`llama serve`, par défaut sur `localhost:9931`) :
+
+```powershell
+llama serve -hf ggml-org/gemma-4-e4b-it-GGUF:Q4_0
+```
+
+Configuration optionnelle (variables d'environnement ou `.env`) :
+
+- `LLAMA_APP_URL` : URL du serveur (défaut `http://localhost:9931`)
+- `LLAMA_APP_API_KEY` : clé Bearer si le serveur a été lancé avec `--api-key`
+
+Les modèles proposés dans l'interface sont ceux renvoyés par `GET /v1/models`.
+
 ## Lancement
 
 ```bash
@@ -54,7 +69,7 @@ python main.py
 - Chargement des matchs pour la saison sélectionnée (`status=all`).
 - Les stratégies dans `user_strategies/` calculent probabilités/cotes à partir des matchs chargés.
 - Panneau d'info match affiche les métadonnées PitchAPI (pas de bookmakers football-data.co.uk).
-- Bouton d'analyse IA via Ollama local (optionnel).
+- Bouton d'analyse IA via llama.app local (optionnel).
 
 ## Notes
 
